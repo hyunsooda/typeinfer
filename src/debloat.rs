@@ -3,6 +3,7 @@ use crate::jssyntax::{
     SEMICOLON, STATEMENT_BLOCK,
 };
 use crate::node::{self, Node};
+use crate::util;
 use tree_sitter::{Point, Range};
 use tree_sitter_traversal::Order;
 
@@ -29,14 +30,16 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str) -> String 
 
     let mut first_stmt_blk = true;
     let mut node = &nodes[1];
+    // TODO: FIXME. (use `node::run_subtree` in the outer loop)
     loop {
         match node.kind() {
             FUNC_DECL => {
                 node::run_subtree(node, code, |child| {
                     match child.kind() {
                         // skip aggregation if a node is a one of the followings
+                        // TODO: Consider other control flows such as switch, for-loop, etc
                         IF_STATEMENT | IF | ELSE | ELSE_CLAUSE | STATEMENT_BLOCK | OPEN_BRACKET
-                        | CLOSE_STATEMENT | FUNC_DECL => {
+                        | CLOSE_STATEMENT => {
                             if node.kind() == FUNC_DECL
                                 && child.kind() == OPEN_BRACKET
                                 && first_stmt_blk
@@ -49,6 +52,7 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str) -> String 
                             aggregate(&child, &mut range_skip, &mut debloated, first_stmt_blk);
                         }
                     }
+                    None
                 });
 
                 first_stmt_blk = true;
@@ -65,4 +69,12 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str) -> String 
         }
     }
     debloated.join("\n")
+}
+
+pub fn debloat(filename: &str, debloated_filename: &str) {
+    let code = util::read_file(&filename).unwrap();
+    let tree = node::get_tree(&code);
+    let nodes = node::get_nodes(tree.walk(), Order::Pre, &code);
+    let debloated_code = debloat_control_flow(&nodes, &code);
+    util::jscode2file(debloated_filename, &debloated_code);
 }
