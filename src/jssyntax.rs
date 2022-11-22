@@ -6,7 +6,6 @@ pub const IF_STATEMENT: &str = "if_statement";
 pub const IF: &str = "if";
 pub const ELSE: &str = "else";
 pub const ELSE_CLAUSE: &str = "else_clause";
-pub const STATEMENT_BLOCK: &str = "statement_block";
 pub const OPEN_BRACKET: &str = "{";
 pub const CLOSE_BRACKET: &str = "}";
 pub const CLOSE_STATEMENT: &str = "}";

@@ -1,6 +1,6 @@
 use crate::jssyntax::{
     CLOSE_STATEMENT, ELSE, ELSE_CLAUSE, FUNC_DECL, IF, IF_STATEMENT, OPEN_BRACKET, PROGRAM,
-    SEMICOLON, STATEMENT_BLOCK,
+    SEMICOLON, STMT_BLK,
 };
 use crate::node::{self, Node};
 use crate::util;
@@ -38,7 +38,7 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str) -> String 
                     match child.kind() {
                         // skip aggregation if a node is a one of the followings
                         // TODO: Consider other control flows such as switch, for-loop, etc
-                        IF_STATEMENT | IF | ELSE | ELSE_CLAUSE | STATEMENT_BLOCK | OPEN_BRACKET
+                        IF_STATEMENT | IF | ELSE | ELSE_CLAUSE | STMT_BLK | OPEN_BRACKET
                         | CLOSE_STATEMENT => {
                             if node.kind() == FUNC_DECL
                                 && child.kind() == OPEN_BRACKET

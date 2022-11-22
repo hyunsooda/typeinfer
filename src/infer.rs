@@ -1,12 +1,10 @@
 use crate::jssyntax::{
-    JSOp, JSTyp, ADD, ASSIGNMENT_STMT, BINARY_EXPR, CLOSE_BRACKET, CLOSE_STATEMENT, DIV, ELSE,
-    ELSE_CLAUSE, EQ, EXPR_STMT, FUNC_DECL, GE, GT, IDENT, IF, IF_STATEMENT, LE, LEXICAL_DECL, LT,
-    MUL, NEQ, NUMBER, OPEN_BRACKET, PROGRAM, RETURN, RETURN_STMT, SEMICOLON, SEQ, SNEQ,
-    STATEMENT_BLOCK, STMT_BLK, STRING, SUB, VAR_DECL,
+    JSOp, JSTyp, ADD, ASSIGNMENT_STMT, BINARY_EXPR, CLOSE_BRACKET, DIV, EQ, EXPR_STMT, FUNC_DECL,
+    GE, GT, IDENT, LE, LEXICAL_DECL, LT, MUL, NEQ, NUMBER, OPEN_BRACKET, RETURN_STMT, SEQ, SNEQ,
+    STMT_BLK, STRING, SUB,
 };
 use crate::node::{self, Node};
 use std::collections::{HashMap, HashSet};
-use tree_sitter::{Point, Range};
 
 type VarMap = HashMap<(usize, String), HashSet<JSTyp>>;
 
@@ -22,9 +20,8 @@ pub fn run_func<'a>(nodes: &Vec<Node<'a>>, code: &str) {
     // TODO: FIXME (Replace with actual parameter name in every colllected callsites)
     insert_var(&mut vars, 0, "a", JSTyp::Undefined);
 
-    let mut node = &nodes[0];
     let mut scope = 0;
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(&nodes[0], code, |child| {
         match child.kind() {
             STMT_BLK => run_stmt_blk(&mut scope, &mut vars, nodes, child, code),
             _ => {}
@@ -41,7 +38,6 @@ fn run_stmt_blk<'a>(
     code: &str,
 ) {
     assert_eq!(node.kind(), STMT_BLK);
-    let mut node = node;
     node::run_subtree(node, code, |child| {
         match child.kind() {
             LEXICAL_DECL => {
@@ -57,7 +53,7 @@ fn run_stmt_blk<'a>(
                 run_stmt_blk(scope, vars, nodes, child, code);
             }
             RETURN_STMT => {
-                let ident = run_return_stmt(scope, vars, child, code);
+                run_return_stmt(child, code);
                 println!("vars: {:?}", vars);
                 stop(&child);
             }
@@ -67,12 +63,7 @@ fn run_stmt_blk<'a>(
     })
 }
 
-fn run_return_stmt<'a>(
-    scope: &mut usize,
-    vars: &mut VarMap,
-    node: &Node<'a>,
-    code: &str,
-) -> String {
+fn run_return_stmt<'a>(node: &Node<'a>, code: &str) -> String {
     assert_eq!(node.kind(), RETURN_STMT);
     let mut ident = "".to_string();
     node::run_subtree(node, code, |child| {
