@@ -1,29 +1,51 @@
 use crate::jssyntax::{
     CLOSE_STATEMENT, ELSE, ELSE_CLAUSE, FUNC_DECL, IF, IF_STATEMENT, OPEN_BRACKET, PROGRAM,
-    SEMICOLON, STMT_BLK,
+    STMT_BLK,
 };
 use crate::node::{self, Node};
 use crate::util;
 use tree_sitter::{Point, Range};
 use tree_sitter_traversal::Order;
 
+pub const NON_BRANCH_ANNOT: &str = "[TypeInfer Annotation (Non-branch)]";
+pub const LOC_ANNOT: &str = "// [TypeInfer Annotation (Loc)]";
+
+fn mapping_source<'a>(node: &Node<'a>, filename: &str) -> String {
+    let range = node.info.range().start_point;
+    format!(
+        "{} {}:{}:{}",
+        LOC_ANNOT,
+        filename,
+        range.row + 1,
+        range.column + 1
+    )
+}
+
 fn aggregate<'a>(
     child: &Node<'a>,
     range_skip: &mut Point,
-    debloated: &mut Vec<&'a str>,
+    debloated: &mut Vec<String>,
     first_stmt_blk: bool,
+    filename: &str,
 ) {
     let Range { end_point, .. } = child.info.range();
     if end_point > *range_skip {
-        debloated.push(child.text);
-        if !first_stmt_blk && !child.text.contains(";") {
-            debloated.push(SEMICOLON);
+        let mut text = if !first_stmt_blk && !child.text.contains(";") {
+            format!("{};", child.text)
+        } else {
+            child.text.to_string()
+        };
+        text = format!("{} {}", text, mapping_source(child, filename));
+        if !node::is_in_ctrl_flow(child) {
+            debloated.push(format!("{}, {}", text, NON_BRANCH_ANNOT));
+        } else {
+            debloated.push(text);
         }
         *range_skip = end_point;
     }
 }
 
-pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str) -> String {
+pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: &str) -> String {
     assert!(nodes[0].kind() == PROGRAM);
     let mut debloated = vec![];
     let mut range_skip = Point { row: 0, column: 0 };
@@ -44,22 +66,34 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str) -> String 
                                 && child.kind() == OPEN_BRACKET
                                 && first_stmt_blk
                             {
-                                debloated.push(child.text);
+                                debloated.push(OPEN_BRACKET.to_string());
                                 first_stmt_blk = false;
                             }
                         }
                         _ => {
-                            aggregate(&child, &mut range_skip, &mut debloated, first_stmt_blk);
+                            aggregate(
+                                &child,
+                                &mut range_skip,
+                                &mut debloated,
+                                first_stmt_blk,
+                                filename,
+                            );
                         }
                     }
                     None
                 });
 
                 first_stmt_blk = true;
-                debloated.push(CLOSE_STATEMENT);
+                debloated.push(CLOSE_STATEMENT.to_string());
             }
             _ => {
-                aggregate(&node, &mut range_skip, &mut debloated, first_stmt_blk);
+                aggregate(
+                    &node,
+                    &mut range_skip,
+                    &mut debloated,
+                    first_stmt_blk,
+                    filename,
+                );
             }
         }
         if let Some(next_node) = node::get_next_node(nodes, &node) {
@@ -75,6 +109,6 @@ pub fn debloat(filename: &str, debloated_filename: &str) {
     let code = util::read_file(&filename).unwrap();
     let tree = node::get_tree(&code);
     let nodes = node::get_nodes(tree.walk(), Order::Pre, &code);
-    let debloated_code = debloat_control_flow(&nodes, &code);
+    let debloated_code = debloat_control_flow(&nodes, &code, filename);
     util::jscode2file(debloated_filename, &debloated_code);
 }
