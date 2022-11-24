@@ -1,7 +1,8 @@
+use crate::debloat::NON_BRANCH_ANNOT;
 use crate::jssyntax::{
-    JSOp, JSTyp, ADD, ASSIGNMENT_STMT, BINARY_EXPR, CLOSE_BRACKET, DIV, EQ, EXPR_STMT, FUNC_DECL,
-    GE, GT, IDENT, LE, LEXICAL_DECL, LT, MUL, NEQ, NUMBER, OPEN_BRACKET, RETURN_STMT, SEQ, SNEQ,
-    STMT_BLK, STRING, SUB,
+    JSOp, JSTyp, ADD, ASSIGNMENT_STMT, BINARY_EXPR, CLOSE_BRACKET, COMMENT, DIV, EQ, EXPR_STMT,
+    FUNC_DECL, GE, GT, IDENT, LE, LEXICAL_DECL, LT, MUL, NEQ, NULL, NUMBER, OPEN_BRACKET,
+    RETURN_STMT, SEQ, SNEQ, STMT_BLK, STRING, SUB,
 };
 use crate::node::{self, Node};
 use std::collections::{HashMap, HashSet};
@@ -14,6 +15,12 @@ fn insert_var(vars: &mut VarMap, scope: usize, var: &str, typ: JSTyp) {
         .insert(typ);
 }
 
+fn overwrite_var(vars: &mut VarMap, scope: usize, var: &str, typ: JSTyp) {
+    let mut s = HashSet::new();
+    s.insert(typ);
+    vars.insert((scope, var.to_string()), s);
+}
+
 pub fn run_func<'a>(nodes: &Vec<Node<'a>>, code: &str) {
     assert_eq!(nodes[0].kind(), FUNC_DECL);
     let mut vars = HashMap::new();
@@ -24,6 +31,7 @@ pub fn run_func<'a>(nodes: &Vec<Node<'a>>, code: &str) {
     node::run_subtree(&nodes[0], code, |child| {
         match child.kind() {
             STMT_BLK => run_stmt_blk(&mut scope, &mut vars, nodes, child, code),
+
             _ => {}
         }
         Some(child.info.range())
@@ -55,7 +63,6 @@ fn run_stmt_blk<'a>(
             RETURN_STMT => {
                 run_return_stmt(child, code);
                 println!("vars: {:?}", vars);
-                stop(&child);
             }
             _ => {}
         }
@@ -84,7 +91,8 @@ fn run_expr_stmt<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, code
                 run_binary_expr(scope, vars, child, code, &None);
             }
             ASSIGNMENT_STMT => {
-                run_assignment_stmt(scope, vars, child, code);
+                let (lhs, typ) = run_assignment_stmt(scope, vars, child, code);
+                overwrite_typ(*scope, vars, &node, code, lhs, typ);
             }
             _ => {}
         }
@@ -111,9 +119,15 @@ fn run_lexical_decl<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, c
     })
 }
 
-fn run_assignment_stmt<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, code: &str) {
+fn run_assignment_stmt<'a>(
+    scope: &mut usize,
+    vars: &mut VarMap,
+    node: &Node<'a>,
+    code: &'a str,
+) -> (&'a str, JSTyp) {
     assert_eq!(node.kind(), ASSIGNMENT_STMT);
     let mut lhs = "";
+    let mut typ = JSTyp::Undefined;
     let mut eq_before = true;
     node::run_subtree(node, code, |child| {
         match child.kind() {
@@ -124,19 +138,26 @@ fn run_assignment_stmt<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>
                 eq_before = false;
             }
             NUMBER => {
-                insert_var(vars, *scope, lhs, JSTyp::Number);
+                typ = JSTyp::Number;
+                insert_var(vars, *scope, lhs, typ.clone());
             }
             STRING => {
-                insert_var(vars, *scope, lhs, JSTyp::String);
+                typ = JSTyp::String;
+                insert_var(vars, *scope, lhs, typ.clone());
+            }
+            NULL => {
+                typ = JSTyp::Null;
+                insert_var(vars, *scope, lhs, typ.clone());
             }
             BINARY_EXPR => {
-                let typ = run_binary_expr(scope, vars, child, code, &None);
-                insert_var(vars, *scope, lhs, typ);
+                typ = run_binary_expr(scope, vars, child, code, &None);
+                insert_var(vars, *scope, lhs, typ.clone());
             }
             _ => {}
         }
         Some(child.info.range())
-    })
+    });
+    (lhs, typ)
 }
 
 fn run_binary_expr<'a>(
@@ -184,9 +205,26 @@ fn run_binary_expr<'a>(
         Some(child.info.range())
     });
     let (lhs, rhs, op) = (lhs.unwrap(), rhs.unwrap(), op.unwrap());
-    op.execute(&lhs, &rhs)
+    op.execute(&lhs, &rhs, node, code)
 }
 
+fn overwrite_typ<'a>(
+    scope: usize,
+    vars: &mut VarMap,
+    node: &Node<'a>,
+    code: &str,
+    var: &str,
+    typ: JSTyp,
+) {
+    if let Some(next_sib) = node.info.next_sibling() {
+        if next_sib.kind() == COMMENT && code[next_sib.byte_range()].contains(NON_BRANCH_ANNOT) {
+            println!("{:?}", vars);
+            overwrite_var(vars, scope, var, typ);
+        }
+    }
+}
+
+// TODO: Remove me
 fn stop<'a>(node: &Node<'a>) {
     println!("STOP! {:?}", node);
     loop {}
