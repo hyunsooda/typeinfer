@@ -1,3 +1,4 @@
+use crate::jssyntax::{ELSE_CLAUSE, IF_STATEMENT};
 use tree_sitter::{Parser, Tree, TreeCursor};
 use tree_sitter::{Point, Range};
 use tree_sitter_traversal::{traverse, Order};
@@ -62,4 +63,17 @@ pub fn run_subtree<'a>(
             }
         }
     }
+}
+
+/// returns true if the parent path includes branch
+pub fn is_in_ctrl_flow<'a>(node: &Node<'a>) -> bool {
+    let mut p = node.info.parent();
+    while let Some(parent) = p {
+        match parent.kind() {
+            IF_STATEMENT | ELSE_CLAUSE => return true,
+            _ => {}
+        }
+        p = parent.parent();
+    }
+    false
 }
