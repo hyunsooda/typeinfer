@@ -1,4 +1,5 @@
-use colored::*;
+use crate::node::Node;
+use crate::report;
 
 use std::ops;
 
@@ -24,6 +25,9 @@ pub const NUMBER: &str = "number";
 pub const STRING: &str = "string";
 pub const RETURN_STMT: &str = "return_statement";
 pub const RETURN: &str = "return";
+pub const OBJECT: &str = "object";
+pub const NULL: &str = "null";
+pub const COMMENT: &str = "comment";
 
 pub const EQ: &str = "==";
 pub const NEQ: &str = "!=";
@@ -134,59 +138,62 @@ pub enum JSOp {
     Div,
 }
 impl JSOp {
-    pub fn execute(&self, a: &JSTyp, b: &JSTyp) -> JSTyp {
+    pub fn execute<'a>(&self, a: &JSTyp, b: &JSTyp, node: &Node<'a>, code: &str) -> JSTyp {
         match self {
             Self::Eq | Self::Neq | Self::Gt | Self::Ge | Self::Lt | Self::Le => {
                 if !a.is_same_typ(b) {
-                    println!(
-                        "{} {:?} {:?} {:?}",
-                        "[Detected cmp violation]".red(),
+                    report::report_typ_op_violation(
+                        node,
+                        code,
                         a,
+                        b,
                         self,
-                        b
+                        "Detected cmp violation",
                     );
                 }
                 JSTyp::Bool
             }
             Self::Seq | Self::Sneq => JSTyp::Bool,
             Self::Add => {
-                self.arithmetic_typ_check(a, b);
+                self.arithmetic_typ_check(a, b, node, code);
                 a.clone() + b.clone()
             }
             Self::Sub => {
-                self.arithmetic_typ_check(a, b);
+                self.arithmetic_typ_check(a, b, node, code);
                 a.clone() - b.clone()
             }
             Self::Mul => {
-                self.arithmetic_typ_check(a, b);
+                self.arithmetic_typ_check(a, b, node, code);
                 a.clone() * b.clone()
             }
             Self::Div => {
-                self.arithmetic_typ_check(a, b);
+                self.arithmetic_typ_check(a, b, node, code);
                 a.clone() / b.clone()
             }
         }
     }
-    fn arithmetic_typ_check(&self, a: &JSTyp, b: &JSTyp) {
+    fn arithmetic_typ_check<'a>(&self, a: &JSTyp, b: &JSTyp, node: &Node<'a>, code: &str) {
         match self {
             Self::Add => match (a, b) {
                 (JSTyp::Number, JSTyp::Number) | (JSTyp::String, JSTyp::String) => {}
-                _ => println!(
-                    "{}, {:?} {:?} {:?}",
-                    "[Detected arithmetic violation]".red(),
+                _ => report::report_typ_op_violation(
+                    node,
+                    code,
                     a,
+                    b,
                     self,
-                    b
+                    "Detected arithmetic violation",
                 ),
             },
             Self::Sub | Self::Mul | Self::Div => match (a, b) {
                 (JSTyp::Number, JSTyp::Number) => {}
-                _ => println!(
-                    "{}, {:?} {:?} {:?}",
-                    "[Detected arithmetic violation]".red(),
+                _ => report::report_typ_op_violation(
+                    node,
+                    code,
                     a,
+                    b,
                     self,
-                    b
+                    "Detected arithmetic violation",
                 ),
             },
             _ => unreachable!("Not expected arithmetic type"),
