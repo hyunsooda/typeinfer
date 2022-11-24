@@ -3,8 +3,10 @@ pub mod infer;
 pub mod instrument;
 pub mod jssyntax;
 pub mod node;
+pub mod report;
 pub mod util;
 
+use crate::node::Node;
 use tree_sitter_traversal::Order;
 
 fn main() {
@@ -20,10 +22,10 @@ fn main() {
     assert_eq!(nodes[0].kind(), jssyntax::PROGRAM);
     nodes.remove(0);
     infer::run_func(&nodes, &code);
+}
 
-    /*
+fn dump_node<'a>(nodes: &Vec<Node<'a>>) {
     for node in nodes {
         println!("{:?}", node);
     }
-    */
 }
