@@ -50,16 +50,11 @@ pub fn run_subtree<'a>(
     code: &'a str,
     mut f: impl FnMut(&Node<'a>) -> Option<Range>,
 ) {
-    let mut run_skip = Range {
-        start_byte: 0,
-        end_byte: 0,
-        start_point: Point { row: 0, column: 0 },
-        end_point: Point { row: 0, column: 0 },
-    };
+    let mut run_skip = Point { row: 0, column: 0 };
     for child in get_nodes(node.info.walk(), Order::Pre, code).iter().skip(1) {
-        if run_skip < child.info.range() {
+        if child.info.range().start_point >= run_skip {
             if let Some(skip) = f(&child) {
-                run_skip = skip;
+                run_skip = skip.end_point;
             }
         }
     }
