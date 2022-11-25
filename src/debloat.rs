@@ -52,7 +52,6 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: 
 
     let mut first_stmt_blk = true;
     let mut node = &nodes[1];
-    // TODO: FIXME. (use `node::run_subtree` in the outer loop)
     loop {
         match node.kind() {
             FUNC_DECL => {
