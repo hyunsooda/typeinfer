@@ -28,6 +28,13 @@ pub const RETURN: &str = "return";
 pub const OBJECT: &str = "object";
 pub const NULL: &str = "null";
 pub const COMMENT: &str = "comment";
+pub const FORMAL_PARAMS: &str = "formal_parameters";
+pub const CALL_EXPR: &str = "call_expression";
+pub const MEMBER_EXPR: &str = "member_expression";
+pub const ARGS: &str = "arguments";
+pub const FALSE: &str = "false";
+pub const TRUE: &str = "true";
+pub const UNDEFINED: &str = "undefined";
 
 pub const EQ: &str = "==";
 pub const NEQ: &str = "!=";
