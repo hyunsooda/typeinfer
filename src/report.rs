@@ -29,7 +29,7 @@ pub fn report_typ_op_violation<'a>(
                     op,
                     rhs_typ,
                     loc2code(loc),
-                    loc,
+                    loc.yellow(),
                 );
                 return;
             }
