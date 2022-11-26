@@ -145,6 +145,22 @@ pub enum JSOp {
     Div,
 }
 impl JSOp {
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Eq => "==".to_string(),
+            Self::Neq => "!=".to_string(),
+            Self::Seq => "===".to_string(),
+            Self::Sneq => "!==".to_string(),
+            Self::Gt => ">".to_string(),
+            Self::Ge => ">=".to_string(),
+            Self::Lt => "<".to_string(),
+            Self::Le => "<=".to_string(),
+            Self::Add => "+".to_string(),
+            Self::Sub => "-".to_string(),
+            Self::Mul => "*".to_string(),
+            Self::Div => "/".to_string(),
+        }
+    }
     pub fn execute<'a>(&self, a: &JSTyp, b: &JSTyp, node: &Node<'a>, code: &str) -> JSTyp {
         match self {
             Self::Eq | Self::Neq | Self::Gt | Self::Ge | Self::Lt | Self::Le => {
