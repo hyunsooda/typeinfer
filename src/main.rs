@@ -29,9 +29,9 @@ fn main() {
     nodes.remove(0);
     dump_node(&nodes, dump_filename);
     let mut vars = HashMap::new();
-    let param_idents = vec![JSTyp::Undefined];
+    let param_typs = &target_callsites[0].1;
     // TODO: FIXME (Replace with actual parameter name in every colllected callsites)
-    infer::run_func(&mut vars, &param_idents, &nodes, &nodes[0], &code);
+    infer::run_func(&mut vars, param_typs, &nodes, &nodes[0], &code);
 }
 
 fn dump_node<'a>(nodes: &Vec<Node<'a>>, filename: &str) {

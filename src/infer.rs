@@ -26,7 +26,7 @@ fn overwrite_var(vars: &mut VarMap, scope: usize, var: &str, typ: JSTyp) {
 
 pub fn run_func<'a>(
     vars: &mut VarMap,
-    param_idents: &Vec<JSTyp>,
+    param_typs: &Vec<JSTyp>,
     nodes: &Vec<Node<'a>>,
     node: &Node<'a>,
     code: &str,
@@ -37,7 +37,7 @@ pub fn run_func<'a>(
         match child.kind() {
             FORMAL_PARAMS => {
                 for (idx, param) in get_func_params(child, code).iter().enumerate() {
-                    insert_var(vars, 0, param, param_idents[idx].clone());
+                    insert_var(vars, 0, param, param_typs[idx].clone());
                 }
             }
             STMT_BLK => run_stmt_blk(&mut scope, vars, nodes, child, code),

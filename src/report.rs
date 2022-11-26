@@ -23,10 +23,10 @@ pub fn report_typ_op_violation<'a>(
                     &loc_annot[LOC_ANNOT.len() + 1..]
                 };
                 println!(
-                    "{} {:?} {:?} {:?} \n{} ({})",
+                    "{} {:?} {} {:?} \n{} ({})",
                     format!("[{}]", prefix).red(),
                     lhs_typ,
-                    op,
+                    op.to_string(),
                     rhs_typ,
                     loc2code(loc),
                     loc.yellow(),
