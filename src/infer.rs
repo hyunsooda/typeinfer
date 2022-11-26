@@ -296,7 +296,7 @@ fn kind2typ<'a>(
         UNDEFINED => Some(JSTyp::Undefined),
         BOOL => Some(JSTyp::Bool),
         CALL_EXPR if is_symbol_call(node, code) => Some(JSTyp::Symbol),
-        // TODO: Object
+        OBJECT => Some(JSTyp::Object),
         _ => unimplemented!(),
     }
 }

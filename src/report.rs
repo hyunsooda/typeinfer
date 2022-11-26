@@ -44,5 +44,5 @@ fn loc2code(loc: &str) -> String {
         (loc[0], loc[1].parse::<usize>().unwrap())
     };
     let code = util::read_file(filename).unwrap();
-    code.split("\n").collect::<Vec<_>>()[row].to_string()
+    code.split("\n").collect::<Vec<_>>()[row - 1].to_string()
 }
