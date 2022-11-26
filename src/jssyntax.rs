@@ -60,7 +60,7 @@ pub enum JSTyp {
     BigInt,
     String,
     Symbol,
-    Object(String),
+    Object,
 }
 impl JSTyp {
     fn sub_mul_div(self, rhs: Self) -> Self {
@@ -70,7 +70,7 @@ impl JSTyp {
             (Self::Symbol, _) | (_, Self::Symbol) | (Self::BigInt, _) | (_, Self::BigInt) => {
                 unreachable!("Actual type error")
             }
-            (Self::Object(_), _) | (_, Self::Object(_)) => Self::String,
+            (Self::Object, _) | (_, Self::Object) => Self::String,
             _ => Self::Number,
         }
     }
@@ -83,7 +83,7 @@ impl JSTyp {
             | (Self::BigInt, Self::BigInt)
             | (Self::String, Self::String)
             | (Self::Symbol, Self::Symbol)
-            | (Self::Object(_), Self::Object(_)) => true,
+            | (Self::Object, Self::Object) => true,
             _ => false,
         }
     }
@@ -95,14 +95,14 @@ impl ops::Add for JSTyp {
         match (self, rhs) {
             (Self::Unknown, _) | (_, Self::Unknown) => Self::Unknown,
             (Self::BigInt, Self::BigInt) => Self::BigInt,
-            (Self::BigInt, Self::Object(_))
-            | (Self::Object(_), Self::BigInt)
+            (Self::BigInt, Self::Object)
+            | (Self::Object, Self::BigInt)
             | (Self::String, _)
             | (_, Self::String) => Self::String,
             (Self::Symbol, _) | (_, Self::Symbol) | (Self::BigInt, _) | (_, Self::BigInt) => {
                 unreachable!("Actual type error")
             }
-            (Self::Object(_), _) | (_, Self::Object(_)) => Self::String,
+            (Self::Object, _) | (_, Self::Object) => Self::String,
             _ => Self::Number,
         }
     }

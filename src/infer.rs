@@ -162,7 +162,6 @@ fn run_assignment_stmt<'a>(
             EQ => {
                 eq_before = false;
             }
-            // TODO: Add unhandled typs
             TRUE | FALSE => {
                 typ = JSTyp::Bool;
             }
@@ -182,8 +181,7 @@ fn run_assignment_stmt<'a>(
                 typ = JSTyp::Symbol;
             }
             OBJECT => {
-                // TODO: Make a hash for object type
-                typ = JSTyp::Object("TODO:FIXME".to_string());
+                typ = JSTyp::Object;
             }
             BINARY_EXPR => {
                 typ = run_binary_expr(scope, vars, child, code, &None);

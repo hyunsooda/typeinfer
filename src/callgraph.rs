@@ -53,7 +53,6 @@ fn run_arguments<'a>(node: &Node<'a>, code: &'a str) -> Vec<JSTyp> {
     let mut typs = vec![];
     node::run_subtree(node, code, |child| {
         match child.kind() {
-            // TODO: Add unhandled typs
             TRUE | FALSE => typs.push(JSTyp::Bool),
             NULL => typs.push(JSTyp::Null),
             UNDEFINED => typs.push(JSTyp::Undefined),
@@ -63,8 +62,7 @@ fn run_arguments<'a>(node: &Node<'a>, code: &'a str) -> Vec<JSTyp> {
                 typs.push(JSTyp::Symbol);
             }
             OBJECT => {
-                // TODO: Make a hash for object type
-                typs.push(JSTyp::Object("TODO:FIXME".to_string()));
+                typs.push(JSTyp::Object);
             }
             _ => {}
         }
