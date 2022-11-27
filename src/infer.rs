@@ -1,4 +1,4 @@
-use crate::debloat::NON_BRANCH_ANNOT;
+use crate::debloat::{NON_BRANCH_ANNOT, PARENT_NODE_ID_ANNOT};
 use crate::jssyntax::{
     JSOp, JSTyp, ADD, ASSIGNMENT_STMT, BINARY_EXPR, CALL_EXPR, CLOSE_BRACKET, COMMENT, DIV, EQ,
     EXPR_STMT, FALSE, FORMAL_PARAMS, FUNC_DECL, GE, GT, IDENT, LE, LEXICAL_DECL, LT, MUL, NEQ,
@@ -10,17 +10,63 @@ use std::collections::{HashMap, HashSet};
 use tree_sitter::{Point, Range};
 use tree_sitter_traversal::{traverse, Order};
 
-type VarMap = HashMap<(usize, String), HashSet<JSTyp>>;
-
-fn insert_var(vars: &mut VarMap, scope: usize, var: &str, typ: JSTyp) {
-    vars.entry((scope, var.to_string()))
-        .or_insert(HashSet::new())
-        .insert(typ);
+type VarMap = HashMap<(usize, String), HashSet<(usize, JSTyp)>>; // <(scope, variable), (parent node id, jstyp)>
+fn varmap_to_string(varmap: &VarMap) -> String {
+    let mut s = "".to_string();
+    for ((_, var), typ_set) in varmap {
+        let mut typ_str = "".to_string();
+        for (_, typ) in typ_set {
+            typ_str = format!("{} {:?},", typ_str, typ);
+        }
+        s = format!("{} {}: ({})", s, var, &typ_str[1..typ_str.len() - 1]);
+    }
+    s
 }
 
-fn overwrite_var(vars: &mut VarMap, scope: usize, var: &str, typ: JSTyp) {
+fn is_overwritable(
+    vars: &VarMap,
+    scope: usize,
+    var: &str,
+    parent_id: usize,
+) -> (bool, Option<JSTyp>) {
+    for ((scope_, var_), typ_set) in vars.into_iter() {
+        for (pid, cur_typ) in typ_set.iter() {
+            if *scope_ == scope && var_ == var && *pid == parent_id {
+                return (true, Some(cur_typ.clone()));
+            }
+        }
+    }
+    (false, None)
+}
+
+fn is_set(vars: &VarMap, scope: usize, var: &str, typ: &JSTyp) -> bool {
+    for ((scope_, var_), typ_set) in vars.into_iter() {
+        for (_, cur_typ) in typ_set.iter() {
+            if *scope_ == scope && var_ == var && cur_typ == typ {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn insert_var(vars: &mut VarMap, scope: usize, var: &str, typ: JSTyp, parent_id: usize) {
+    let (overwritable, prev_typ) = is_overwritable(&vars, scope, var, parent_id);
+    if overwritable {
+        let mut h = vars.get_mut(&(scope, var.to_string())).unwrap();
+        h.remove(&(parent_id, prev_typ.unwrap()));
+    }
+
+    if !is_set(&vars, scope, var, &typ) {
+        vars.entry((scope, var.to_string()))
+            .or_insert(HashSet::new())
+            .insert((parent_id, typ));
+    }
+}
+
+fn overwrite_var(vars: &mut VarMap, scope: usize, var: &str, typ: JSTyp, parent_id: usize) {
     let mut s = HashSet::new();
-    s.insert(typ);
+    s.insert((parent_id, typ));
     vars.insert((scope, var.to_string()), s);
 }
 
@@ -36,24 +82,24 @@ pub fn run_func<'a>(
     node::run_subtree(node, code, |child| {
         match child.kind() {
             FORMAL_PARAMS => {
-                for (idx, param) in get_func_params(child, code).iter().enumerate() {
-                    insert_var(vars, 0, param, param_typs[idx].clone());
+                for (idx, param_child) in get_func_params(child, code).iter().enumerate() {
+                    let parent_id = node::get_parent_id(node::get_annot(param_child, code), code);
+                    insert_var(vars, 0, param_child.text, param_typs[idx].clone(), 0);
                 }
             }
             STMT_BLK => run_stmt_blk(&mut scope, vars, nodes, child, code),
-
             _ => {}
         }
         Some(child.info.range())
     });
 }
 
-fn get_func_params<'a>(node: &Node<'a>, code: &'a str) -> Vec<&'a str> {
+fn get_func_params<'a>(node: &Node<'a>, code: &'a str) -> Vec<Node<'a>> {
     assert_eq!(node.kind(), FORMAL_PARAMS);
     let mut params = vec![];
     node::run_subtree(node, code, |child| {
         match child.kind() {
-            IDENT => params.push(child.text),
+            IDENT => params.push(child.clone()),
             _ => {}
         }
         Some(child.info.range())
@@ -75,7 +121,8 @@ fn run_stmt_blk<'a>(
                 run_lexical_decl(scope, vars, child, code);
             }
             ASSIGNMENT_STMT => {
-                run_assignment_stmt(scope, vars, child, code);
+                let (lhs, typ, parent_id) = run_assignment_stmt(scope, vars, child, code);
+                insert_var(vars, *scope, lhs, typ.clone(), parent_id);
             }
             EXPR_STMT => {
                 run_expr_stmt(scope, vars, child, code);
@@ -85,7 +132,7 @@ fn run_stmt_blk<'a>(
             }
             RETURN_STMT => {
                 run_return_stmt(child, code);
-                println!("vars: {:?}", vars);
+                println!("vars: {}", varmap_to_string(&vars));
             }
             _ => {}
         }
@@ -115,8 +162,10 @@ fn run_expr_stmt<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, code
                 return Some(child.info.range());
             }
             ASSIGNMENT_STMT => {
-                let (lhs, typ) = run_assignment_stmt(scope, vars, child, code);
-                overwrite_typ(*scope, vars, &node, code, lhs, typ);
+                let (lhs, typ, parent_id) = run_assignment_stmt(scope, vars, child, code);
+                if !overwrite_typ(*scope, vars, &node, code, lhs, typ.clone()) {
+                    insert_var(vars, *scope, lhs, typ.clone(), parent_id);
+                }
                 return Some(child.info.range());
             }
             _ => {}
@@ -136,7 +185,8 @@ fn run_lexical_decl<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, c
                 *scope -= 1;
             }
             IDENT => {
-                insert_var(vars, *scope, child.text, JSTyp::Undefined);
+                let parent_id = node::get_parent_id(node::get_annot(node, code), code);
+                insert_var(vars, *scope, child.text, JSTyp::Undefined, parent_id);
             }
             _ => {}
         }
@@ -149,7 +199,7 @@ fn run_assignment_stmt<'a>(
     vars: &mut VarMap,
     node: &Node<'a>,
     code: &'a str,
-) -> (&'a str, JSTyp) {
+) -> (&'a str, JSTyp, usize) {
     assert_eq!(node.kind(), ASSIGNMENT_STMT);
     let mut lhs = "";
     let mut typ = JSTyp::Undefined;
@@ -190,8 +240,9 @@ fn run_assignment_stmt<'a>(
         }
         Some(child.info.range())
     });
-    insert_var(vars, *scope, lhs, typ.clone());
-    (lhs, typ)
+    let parent_id = node::get_parent_id(node::get_annot(node, code), code);
+    //insert_var(vars, *scope, lhs, typ.clone(), parent_id);
+    (lhs, typ, parent_id)
 }
 
 pub fn is_symbol_call<'a>(node: &Node<'a>, code: &str) -> bool {
@@ -222,11 +273,11 @@ fn run_binary_expr<'a>(
                 if node.kind() != CALL_EXPR || is_symbol_call(child, code) {
                     if last_calc_typ.is_some() && lhs.is_none() {
                         lhs = last_calc_typ.clone();
-                        rhs = kind2typ(child, vars, *scope, child.text, code);
+                        rhs = Some(kind2typ(child, vars, *scope, child.text, code));
                     } else if lhs.is_none() {
-                        lhs = kind2typ(child, vars, *scope, child.text, code);
+                        lhs = Some(kind2typ(child, vars, *scope, child.text, code));
                     } else {
-                        rhs = kind2typ(child, vars, *scope, child.text, code);
+                        rhs = Some(kind2typ(child, vars, *scope, child.text, code));
                     }
                 }
             }
@@ -259,12 +310,15 @@ fn overwrite_typ<'a>(
     code: &str,
     var: &str,
     typ: JSTyp,
-) {
-    if let Some(next_sib) = node.info.next_sibling() {
-        if next_sib.kind() == COMMENT && code[next_sib.byte_range()].contains(NON_BRANCH_ANNOT) {
-            println!("vars{:?}", vars);
-            overwrite_var(vars, scope, var, typ);
-        }
+) -> bool {
+    let next_sib = node.info.next_sibling().unwrap();
+    if next_sib.kind() == COMMENT && code[next_sib.byte_range()].contains(NON_BRANCH_ANNOT) {
+        println!("vars: {}", varmap_to_string(&vars));
+        let parent_id = node::get_parent_id(node::get_annot(node, code), code);
+        overwrite_var(vars, scope, var, typ, parent_id);
+        true
+    } else {
+        false
     }
 }
 
@@ -274,29 +328,25 @@ fn stop<'a>(node: &Node<'a>) {
     loop {}
 }
 
-fn kind2typ<'a>(
-    node: &Node<'a>,
-    vars: &mut VarMap,
-    scope: usize,
-    text: &str,
-    code: &str,
-) -> Option<JSTyp> {
+fn kind2typ<'a>(node: &Node<'a>, vars: &mut VarMap, scope: usize, text: &str, code: &str) -> JSTyp {
     match node.kind() {
         IDENT => {
             let typs = vars.get(&(scope, text.to_string())).unwrap();
             if typs.len() > 1 {
-                return Some(JSTyp::Unknown);
+                return JSTyp::Unknown;
             } else {
-                return typs.iter().next().cloned();
+                //return typs.iter().next().cloned();
+                let (_, typ) = typs.iter().next().cloned().unwrap();
+                return typ;
             }
         }
-        NUMBER => Some(number2typ(node)),
-        STRING => Some(JSTyp::String),
-        NULL => Some(JSTyp::Null),
-        UNDEFINED => Some(JSTyp::Undefined),
-        BOOL => Some(JSTyp::Bool),
-        CALL_EXPR if is_symbol_call(node, code) => Some(JSTyp::Symbol),
-        OBJECT => Some(JSTyp::Object),
+        NUMBER => number2typ(node),
+        STRING => JSTyp::String,
+        NULL => JSTyp::Null,
+        UNDEFINED => JSTyp::Undefined,
+        BOOL => JSTyp::Bool,
+        CALL_EXPR if is_symbol_call(node, code) => JSTyp::Symbol,
+        OBJECT => JSTyp::Object,
         _ => unimplemented!(),
     }
 }
