@@ -1,14 +1,14 @@
 use crate::jssyntax::{
-    CLOSE_STATEMENT, ELSE, ELSE_CLAUSE, FUNC_DECL, IF, IF_STATEMENT, OPEN_BRACKET, PROGRAM,
-    STMT_BLK,
+    CLOSE_BRACKET, ELSE, ELSE_CLAUSE, FUNC_DECL, IF, IF_STATEMENT, OPEN_BRACKET, PROGRAM, STMT_BLK,
 };
 use crate::node::{self, Node};
 use crate::util;
 use tree_sitter::{Point, Range};
 use tree_sitter_traversal::Order;
 
-pub const NON_BRANCH_ANNOT: &str = "[TypeInfer Annotation (Non-branch)]";
-pub const LOC_ANNOT: &str = "// [TypeInfer Annotation (Loc)]";
+pub const LOC_ANNOT: &str = "// [Loc]";
+pub const NON_BRANCH_ANNOT: &str = "[Non-branch]";
+pub const PARENT_NODE_ID_ANNOT: &str = "[Parent-ID]";
 
 fn mapping_source<'a>(node: &Node<'a>, filename: &str) -> String {
     let range = node.info.range().start_point;
@@ -37,10 +37,15 @@ fn aggregate<'a>(
         };
         text = format!("{} {}", text, mapping_source(child, filename));
         if !node::is_in_ctrl_flow(child) {
-            debloated.push(format!("{}, {}", text, NON_BRANCH_ANNOT));
-        } else {
-            debloated.push(text);
+            text = format!("{}, {}", text, NON_BRANCH_ANNOT);
         }
+        text = format!(
+            "{}, {} {},",
+            text,
+            PARENT_NODE_ID_ANNOT,
+            child.info.parent().unwrap().id()
+        );
+        debloated.push(text);
         *range_skip = end_point;
     }
 }
@@ -60,7 +65,7 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: 
                         // skip aggregation if a node is a one of the followings
                         // TODO: Consider other control flows such as switch, for-loop, etc
                         IF_STATEMENT | IF | ELSE | ELSE_CLAUSE | STMT_BLK | OPEN_BRACKET
-                        | CLOSE_STATEMENT => {
+                        | CLOSE_BRACKET => {
                             if node.kind() == FUNC_DECL
                                 && child.kind() == OPEN_BRACKET
                                 && first_stmt_blk
@@ -83,7 +88,7 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: 
                 });
 
                 first_stmt_blk = true;
-                debloated.push(CLOSE_STATEMENT.to_string());
+                debloated.push(CLOSE_BRACKET.to_string());
             }
             _ => {
                 aggregate(
