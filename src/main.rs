@@ -7,7 +7,6 @@ pub mod node;
 pub mod report;
 pub mod util;
 
-use crate::jssyntax::JSTyp;
 use crate::node::Node;
 use std::collections::HashMap;
 use tree_sitter_traversal::Order;

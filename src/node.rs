@@ -1,4 +1,4 @@
-use crate::debloat::{LOC_ANNOT, NON_BRANCH_ANNOT, PARENT_NODE_ID_ANNOT};
+use crate::debloat::{LOC_ANNOT, PARENT_NODE_ID_ANNOT};
 use crate::jssyntax::{COMMENT, ELSE_CLAUSE, IF_STATEMENT};
 use tree_sitter::{Parser, Tree, TreeCursor};
 use tree_sitter::{Point, Range};
@@ -94,11 +94,11 @@ pub fn get_annot<'a>(node: &Node<'a>, code: &'a str) -> &'a str {
     unreachable!();
 }
 
-pub fn get_loc<'a>(annot: &'a str, code: &'a str) -> &'a str {
+pub fn get_loc<'a>(annot: &'a str) -> &'a str {
     &annot[LOC_ANNOT.len() + 1..annot.find(",").unwrap()]
 }
 
-pub fn get_parent_id(annot: &str, code: &str) -> usize {
+pub fn get_parent_id(annot: &str) -> usize {
     let parent_id_annot = {
         let annot =
             &annot[annot.find(PARENT_NODE_ID_ANNOT).unwrap() + PARENT_NODE_ID_ANNOT.len() + 1..];

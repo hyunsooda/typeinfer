@@ -1,5 +1,3 @@
-use crate::debloat::LOC_ANNOT;
-use crate::jssyntax::COMMENT;
 use crate::jssyntax::{JSOp, JSTyp};
 use crate::node::{self, Node};
 use crate::util;
@@ -15,7 +13,7 @@ pub fn report_typ_op_violation<'a>(
     prefix: &str,
 ) {
     let annot = node::get_annot(node, code);
-    let loc = node::get_loc(annot, code);
+    let loc = node::get_loc(annot);
     println!(
         "{} {:?} {} {:?} \n{} ({})",
         format!("[{}]", prefix).red(),
