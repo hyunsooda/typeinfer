@@ -13,9 +13,12 @@ use tree_sitter_traversal::{traverse, Order};
 type VarMap = HashMap<(usize, String), HashSet<(usize, JSTyp)>>; // <(scope, variable), (parent node id, jstyp)>
 fn varmap_to_string(varmap: &VarMap) -> String {
     let mut s = "".to_string();
-    for ((_, var), typ_set) in varmap {
+    let mut keys = varmap.keys().collect::<Vec<_>>();
+    keys.sort();
+    for k in keys {
+        let (_, var) = k;
         let mut typ_str = "".to_string();
-        for (_, typ) in typ_set {
+        for (_, typ) in varmap.get(k).unwrap() {
             typ_str = format!("{} {:?},", typ_str, typ);
         }
         s = format!("{} {}: ({})", s, var, &typ_str[1..typ_str.len() - 1]);
