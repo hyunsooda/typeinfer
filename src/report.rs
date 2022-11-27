@@ -1,7 +1,7 @@
 use crate::debloat::LOC_ANNOT;
 use crate::jssyntax::COMMENT;
 use crate::jssyntax::{JSOp, JSTyp};
-use crate::node::Node;
+use crate::node::{self, Node};
 use crate::util;
 use colored::*;
 
@@ -14,28 +14,17 @@ pub fn report_typ_op_violation<'a>(
     op: &JSOp,
     prefix: &str,
 ) {
-    let mut p = node.info.parent();
-    while let Some(parent) = p {
-        if let Some(next_sib) = parent.next_sibling() {
-            if next_sib.kind() == COMMENT {
-                let loc = {
-                    let loc_annot = &code[next_sib.byte_range()];
-                    &loc_annot[LOC_ANNOT.len() + 1..]
-                };
-                println!(
-                    "{} {:?} {} {:?} \n{} ({})",
-                    format!("[{}]", prefix).red(),
-                    lhs_typ,
-                    op.to_string(),
-                    rhs_typ,
-                    loc2code(loc),
-                    loc.yellow(),
-                );
-                return;
-            }
-        }
-        p = parent.parent();
-    }
+    let annot = node::get_annot(node, code);
+    let loc = node::get_loc(annot, code);
+    println!(
+        "{} {:?} {} {:?} \n{} ({})",
+        format!("[{}]", prefix).red(),
+        lhs_typ,
+        op.to_string(),
+        rhs_typ,
+        loc2code(loc),
+        loc.yellow(),
+    );
 }
 
 fn loc2code(loc: &str) -> String {

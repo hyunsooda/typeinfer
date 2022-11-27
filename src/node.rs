@@ -1,4 +1,5 @@
-use crate::jssyntax::{ELSE_CLAUSE, IF_STATEMENT};
+use crate::debloat::{LOC_ANNOT, NON_BRANCH_ANNOT, PARENT_NODE_ID_ANNOT};
+use crate::jssyntax::{COMMENT, ELSE_CLAUSE, IF_STATEMENT};
 use tree_sitter::{Parser, Tree, TreeCursor};
 use tree_sitter::{Point, Range};
 use tree_sitter_traversal::{traverse, Order};
@@ -65,10 +66,43 @@ pub fn is_in_ctrl_flow<'a>(node: &Node<'a>) -> bool {
     let mut p = node.info.parent();
     while let Some(parent) = p {
         match parent.kind() {
+            // TODO: Consider other branchs such as switch and for-loop
             IF_STATEMENT | ELSE_CLAUSE => return true,
             _ => {}
         }
         p = parent.parent();
     }
     false
+}
+
+pub fn get_annot<'a>(node: &Node<'a>, code: &'a str) -> &'a str {
+    if let Some(next_sib) = node.info.next_sibling() {
+        if next_sib.kind() == COMMENT {
+            return &code[next_sib.byte_range()];
+        }
+    }
+
+    let mut p = node.info.parent();
+    while let Some(parent) = p {
+        if let Some(next_sib) = parent.next_sibling() {
+            if next_sib.kind() == COMMENT {
+                return &code[next_sib.byte_range()];
+            }
+        }
+        p = parent.parent();
+    }
+    unreachable!();
+}
+
+pub fn get_loc<'a>(annot: &'a str, code: &'a str) -> &'a str {
+    &annot[LOC_ANNOT.len() + 1..annot.find(",").unwrap()]
+}
+
+pub fn get_parent_id(annot: &str, code: &str) -> usize {
+    let parent_id_annot = {
+        let annot =
+            &annot[annot.find(PARENT_NODE_ID_ANNOT).unwrap() + PARENT_NODE_ID_ANNOT.len() + 1..];
+        &annot[..annot.find(",").unwrap()]
+    };
+    parent_id_annot.parse::<usize>().unwrap()
 }
