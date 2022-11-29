@@ -1,5 +1,8 @@
 use crate::jssyntax::{
-    CLOSE_BRACKET, ELSE, ELSE_CLAUSE, FUNC_DECL, IF, IF_STATEMENT, OPEN_BRACKET, PROGRAM, STMT_BLK,
+    BREAK, BREAK_STMT, CASE, CLOSE_BRACKET, CLOSE_PARENTHESIS, COLON, CONTINUE, CONTINUE_STMT, DO,
+    DO_STMT, ELSE, ELSE_CLAUSE, EMPTY_STMT, FOR, FOR_IN_STMT, FOR_STMT, FUNC_DECL, IF,
+    IF_STATEMENT, OPEN_BRACKET, OPEN_PARENTHESIS, PROGRAM, SEMICOLON, STMT_BLK, SWITCH,
+    SWITCH_BODY, SWITCH_CASE, SWITCH_STMT, WHILE, WHILE_STMT,
 };
 use crate::node::{self, Node};
 use crate::util;
@@ -61,19 +64,39 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: 
         match node.kind() {
             FUNC_DECL => {
                 node::run_subtree(node, code, |child| {
+                    let parent = child.info.parent().unwrap();
                     match child.kind() {
                         // skip aggregation if a node is a one of the followings
                         // TODO: Consider other control flows such as switch, for-loop, etc
-                        IF_STATEMENT | IF | ELSE | ELSE_CLAUSE | STMT_BLK | OPEN_BRACKET
-                        | CLOSE_BRACKET => {
-                            if node.kind() == FUNC_DECL
-                                && child.kind() == OPEN_BRACKET
-                                && first_stmt_blk
-                            {
+                        IF_STATEMENT | IF | ELSE | ELSE_CLAUSE | STMT_BLK | CLOSE_BRACKET
+                        | SWITCH_CASE | SWITCH_BODY | SWITCH_STMT | CASE | SWITCH | COLON
+                        | FOR_STMT | FOR | BREAK_STMT | BREAK | EMPTY_STMT | WHILE_STMT | WHILE
+                        | DO_STMT | DO | CONTINUE_STMT | CONTINUE => {}
+                        // Debloat '(' and ')' if they appears in 'for statement'
+                        OPEN_PARENTHESIS | CLOSE_PARENTHESIS if parent.kind() == FOR_STMT => {}
+                        OPEN_BRACKET => {
+                            if first_stmt_blk {
                                 debloated.push(OPEN_BRACKET.to_string());
                                 first_stmt_blk = false;
                             }
                         }
+                        SEMICOLON
+                            if parent.kind() == BREAK_STMT
+                                || parent.kind() == EMPTY_STMT
+                                || parent.kind() == CONTINUE_STMT => {}
+                        /*
+                        FOR_IN_STMT => {
+                            let mut a = child.clone();
+                            a.text = &a.text[3..];
+                            aggregate(
+                                &a,
+                                &mut range_skip,
+                                &mut debloated,
+                                first_stmt_blk,
+                                filename,
+                            );
+                        }
+                        */
                         _ => {
                             aggregate(
                                 &child,
