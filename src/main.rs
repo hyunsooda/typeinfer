@@ -11,11 +11,21 @@ use crate::node::Node;
 use std::collections::HashMap;
 use tree_sitter_traversal::Order;
 
+fn dump_origin_source() {
+    let code = util::read_file("example/example.js").unwrap();
+    let tree = node::get_tree(&code);
+    let nodes = node::get_nodes(tree.walk(), Order::Pre, &code);
+    let filename = "node-dump.txt";
+    dump_node(&nodes, filename);
+}
+
 fn main() {
+    dump_origin_source();
+
     // 1. Debloat origin source code to remove control flows
     let filename = "example/example.js";
     let debloated_filename = "debloated.js";
-    let dump_filename = "node-dump.txt";
+    let dump_filename = "debloated-dump.txt";
     debloat::debloat(filename, debloated_filename);
 
     // 2. Run infer
