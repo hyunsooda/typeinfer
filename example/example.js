@@ -3,14 +3,17 @@ function foo(a) {
   if (a == 10) {
     if (a+10 < 30) {
       b = 200 + 100 === 10;
+      b = false + true;
     } else {
       b = "hello";
+      let b = 1+2;
+      b = "world";
     }
   } else {
-    b = 100;
+    b = null;
   }
+  b = {kk:null, nn:555n};
   return b;
 }
 
-const v = foo(100);
-console.log(typeof v);
+const v = foo(undefined);
