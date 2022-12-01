@@ -12,7 +12,7 @@ pub fn gather_callsites<'a>(
 ) -> Vec<(Node<'a>, Vec<JSTyp>)> {
     assert_eq!(node.kind(), PROGRAM);
     let mut callsites = vec![];
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             CALL_EXPR => {
                 let (call_expr_node, param_typs) = run_call_expr(target_func_ident, child, code);
@@ -36,7 +36,7 @@ fn run_call_expr<'a>(
     assert_eq!(node.kind(), CALL_EXPR);
     let mut func_node = None;
     let mut args = vec![];
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             IDENT if target_func_ident == child.text => func_node = Some(child.clone()),
             ARGS => args = run_arguments(child, code),
@@ -51,7 +51,7 @@ fn run_call_expr<'a>(
 fn run_arguments<'a>(node: &Node<'a>, code: &'a str) -> Vec<JSTyp> {
     assert_eq!(node.kind(), ARGS);
     let mut typs = vec![];
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             TRUE | FALSE => typs.push(JSTyp::Bool),
             NULL => typs.push(JSTyp::Null),
