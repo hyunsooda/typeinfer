@@ -1,5 +1,6 @@
 use crate::debloat::{LOC_ANNOT, PARENT_NODE_ID_ANNOT};
-use crate::jssyntax::{COMMENT, ELSE_CLAUSE, IF_STATEMENT};
+use crate::jssyntax::{COMMENT, ELSE_CLAUSE, IF_STATEMENT, STMT_BLK};
+use crate::node;
 use tree_sitter::{Parser, Tree, TreeCursor};
 use tree_sitter::{Point, Range};
 use tree_sitter_traversal::{traverse, Order};
@@ -49,12 +50,13 @@ pub fn get_next_node<'a>(nodes: &'a Vec<Node<'a>>, target: &Node<'a>) -> Option<
 pub fn run_subtree<'a>(
     node: &Node<'a>,
     code: &'a str,
-    mut f: impl FnMut(&Node<'a>) -> Option<Range>,
+    mut f: impl FnMut(&Node<'a>, bool) -> Option<Range>,
 ) {
     let mut run_skip = Point { row: 0, column: 0 };
-    for child in get_nodes(node.info.walk(), Order::Pre, code).iter().skip(1) {
+    let nodes = get_nodes(node.info.walk(), Order::Pre, code);
+    for (idx, child) in nodes.iter().skip(1).enumerate() {
         if child.info.range().start_point >= run_skip {
-            if let Some(skip) = f(&child) {
+            if let Some(skip) = f(&child, idx == nodes.len() - 2) {
                 run_skip = skip.end_point;
             }
         }
@@ -90,6 +92,14 @@ pub fn get_annot<'a>(node: &Node<'a>, code: &'a str) -> &'a str {
             }
         }
         p = parent.parent();
+    }
+
+    // function comment
+    if let Some(p) = node.info.parent() {
+        let stmt_blk_node = p.next_sibling().unwrap();
+        assert_eq!(stmt_blk_node.kind(), STMT_BLK);
+        let children = node::get_nodes(stmt_blk_node.walk(), Order::Pre, &code);
+        return &code[children[2].info.byte_range()];
     }
     unreachable!();
 }
