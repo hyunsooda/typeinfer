@@ -23,6 +23,7 @@ pub const STMT_BLK: &str = "statement_block";
 pub const EXPR_STMT: &str = "expression_statement";
 pub const NUMBER: &str = "number";
 pub const STRING: &str = "string";
+pub const STRING_FRAGMENT: &str = "string_fragment";
 pub const RETURN_STMT: &str = "return_statement";
 pub const RETURN: &str = "return";
 pub const OBJECT: &str = "object";
@@ -55,6 +56,9 @@ pub const DO: &str = "do";
 pub const CONTINUE_STMT: &str = "continue_statement";
 pub const CONTINUE: &str = "continue";
 pub const FOR_IN_STMT: &str = "for_in_statement";
+pub const PARENTHESIZED_EXPR: &str = "parenthesized_expression";
+pub const DOUBLE_QUOTE: &str = "\"";
+pub const PAIR: &str = "pair";
 
 pub const EQ: &str = "==";
 pub const NEQ: &str = "!=";
