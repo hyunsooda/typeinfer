@@ -81,7 +81,7 @@ pub fn run_func<'a>(
 ) {
     assert_eq!(node.kind(), FUNC_DECL);
     let mut scope = 0;
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             FORMAL_PARAMS => {
                 for (idx, param_child) in get_func_params(child, code).iter().enumerate() {
@@ -105,7 +105,7 @@ pub fn run_func<'a>(
 fn get_func_params<'a>(node: &Node<'a>, code: &'a str) -> Vec<Node<'a>> {
     assert_eq!(node.kind(), FORMAL_PARAMS);
     let mut params = vec![];
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             IDENT => params.push(child.clone()),
             _ => {}
@@ -123,7 +123,7 @@ fn run_stmt_blk<'a>(
     code: &str,
 ) {
     assert_eq!(node.kind(), STMT_BLK);
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             LEXICAL_DECL => {
                 run_lexical_decl(scope, vars, child, code);
@@ -151,7 +151,7 @@ fn run_stmt_blk<'a>(
 fn run_return_stmt<'a>(node: &Node<'a>, code: &str) -> String {
     assert_eq!(node.kind(), RETURN_STMT);
     let mut ident = "".to_string();
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             IDENT => ident = child.text.to_string(),
             _ => {}
@@ -163,7 +163,7 @@ fn run_return_stmt<'a>(node: &Node<'a>, code: &str) -> String {
 
 fn run_expr_stmt<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, code: &str) {
     assert_eq!(node.kind(), EXPR_STMT);
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             BINARY_EXPR => {
                 run_binary_expr(scope, vars, child, code, &None);
@@ -184,7 +184,9 @@ fn run_expr_stmt<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, code
 
 fn run_lexical_decl<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, code: &str) {
     assert_eq!(node.kind(), LEXICAL_DECL);
-    node::run_subtree(node, code, |child| {
+    let mut ident = None;
+    let mut typ = JSTyp::Undefined;
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             OPEN_BRACKET => {
                 *scope += 1;
@@ -193,13 +195,42 @@ fn run_lexical_decl<'a>(scope: &mut usize, vars: &mut VarMap, node: &Node<'a>, c
                 *scope -= 1;
             }
             IDENT => {
-                let parent_id = node::get_parent_id(node::get_annot(node, code));
-                insert_var(vars, *scope, child.text, JSTyp::Undefined, parent_id);
+                if let Some(ident_) = ident {
+                    let parent_id = node::get_parent_id(node::get_annot(node, code));
+                    insert_var(vars, *scope, ident_, typ.clone(), parent_id);
+                }
+                ident = Some(child.text);
+            }
+            TRUE | FALSE => {
+                typ = JSTyp::Bool;
+            }
+            NULL => {
+                typ = JSTyp::Null;
+            }
+            UNDEFINED => {
+                typ = JSTyp::Undefined;
+            }
+            NUMBER => {
+                typ = number2typ(child);
+            }
+            STRING => {
+                typ = JSTyp::String;
+            }
+            CALL_EXPR if is_symbol_call(child, code) => {
+                typ = JSTyp::Symbol;
+            }
+            OBJECT => {
+                typ = JSTyp::Object;
+            }
+            BINARY_EXPR => {
+                typ = run_binary_expr(scope, vars, child, code, &None);
             }
             _ => {}
         }
         None
-    })
+    });
+    let parent_id = node::get_parent_id(node::get_annot(node, code));
+    insert_var(vars, *scope, ident.unwrap(), typ, parent_id);
 }
 
 fn run_assignment_stmt<'a>(
@@ -212,7 +243,7 @@ fn run_assignment_stmt<'a>(
     let mut lhs = "";
     let mut typ = JSTyp::Undefined;
     let mut eq_before = true;
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             IDENT if eq_before == true => {
                 lhs = child.text;
@@ -272,7 +303,7 @@ fn run_binary_expr<'a>(
 ) -> JSTyp {
     assert_eq!(node.kind(), BINARY_EXPR);
     let (mut lhs, mut rhs, mut op) = (None, None, None);
-    node::run_subtree(node, code, |child| {
+    node::run_subtree(node, code, |child, last| {
         match child.kind() {
             BINARY_EXPR => {
                 lhs = Some(run_binary_expr(scope, vars, child, code, &lhs));
