@@ -93,7 +93,7 @@ fn aggregate<'a>(
     filename: &str,
 ) {
     let mut text = if !first_stmt_blk && !text.contains(";") && !text.contains("function") {
-        format!("{};", text)
+        format!("{}{}", text, SEMICOLON.to_string())
     } else {
         text.to_string()
     };
@@ -109,6 +109,14 @@ fn aggregate<'a>(
         child.info.parent().unwrap().id()
     );
     debloated.push(text);
+}
+
+fn append_text(text: &str, to_append: &str) -> String {
+    if text.len() == 0 {
+        to_append.to_string()
+    } else {
+        format!("{text} {to_append}")
+    }
 }
 
 pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: &str) -> String {
@@ -134,7 +142,7 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: 
             } else {
                 if last {
                     if text.len() > 0 {
-                        text = format!("{} {}", text, child.text);
+                        text = append_text(&text, child.text);
                         aggregate(&mut debloated, &child, &text, first_stmt_blk, filename);
                     }
                     text = "".to_string();
@@ -152,19 +160,19 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: 
                 OPEN_BRACKET => {
                     if first_stmt_blk {
                         if node.kind() == FUNC_DECL {
-                            text = format!("{} {}", text, OPEN_BRACKET.to_string());
+                            text = append_text(&text, OPEN_BRACKET);
                         }
                         first_stmt_blk = false;
                     }
                     scope_env.lvl += 1;
                     scope_env.lvl_visited.push(scope_env.lvl);
                     if parent.kind() == OBJECT {
-                        text = format!("{} {}", text, OPEN_BRACKET.to_string());
+                        text = append_text(&text, OPEN_BRACKET);
                     }
                 }
                 CLOSE_BRACKET => {
                     if parent.kind() == OBJECT {
-                        text = format!("{} {}", text, CLOSE_BRACKET.to_string());
+                        text = append_text(&text, CLOSE_BRACKET);
                     }
                     scope_env.lvl -= 1;
                 }
@@ -173,14 +181,14 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: 
                         || parent.kind() == EMPTY_STMT
                         || parent.kind() == CONTINUE_STMT => {}
                 STRING_FRAGMENT => {
-                    text = format!("{}{}", text, child.text);
+                    text = append_text(&text, child.text);
                 }
                 DOUBLE_QUOTE => {
-                    text = format!("{}{}", text, DOUBLE_QUOTE.to_string());
+                    text = append_text(&text, DOUBLE_QUOTE);
                 }
                 COLON => {
                     if parent.kind() != SWITCH_CASE {
-                        text = format!("{} {}", text, child.text);
+                        text = append_text(&text, child.text);
                     } else {
                         aggregate(&mut debloated, &child, &text, first_stmt_blk, filename);
                         text = "".to_string();
@@ -188,15 +196,15 @@ pub fn debloat_control_flow<'a>(nodes: &Vec<Node<'a>>, code: &'a str, filename: 
                 }
                 IDENT => match parent.kind() {
                     FUNC_DECL | CALL_EXPR => {
-                        text = format!("{} {}", text, child.text);
+                        text = append_text(&text, child.text);
                     }
                     _ => {
                         let ident = get_scoped_ident(&mut vars, child, &mut scope_env);
-                        text = format!("{} {}", text, ident);
+                        text = append_text(&text, &ident);
                     }
                 },
                 _ => {
-                    text = format!("{} {}", text, child.text);
+                    text = append_text(&text, child.text);
                 }
             }
             None
@@ -220,4 +228,50 @@ pub fn debloat(filename: &str, debloated_filename: &str) {
     let nodes = node::get_nodes(tree.walk(), Order::Pre, &code);
     let debloated_code = debloat_control_flow(&nodes, &code, filename);
     util::jscode2file(debloated_filename, &debloated_code);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn testSSA() {
+        let filename = "test/debloat/scope.js";
+        let debloated_filename = "test/debloat/scope_debloated.js";
+        debloat(filename, debloated_filename);
+        let debloated_code = util::read_file(debloated_filename).unwrap();
+        let debloated_code = debloated_code
+            .split("\n")
+            .map(|line| {
+                let mut s = "".to_string();
+                for (idx, l) in line.chars().enumerate() {
+                    if l == '/' && line.len() > idx && line.chars().nth(idx + 1).unwrap() == '/' {
+                        s.pop();
+                        break;
+                    }
+                    s = format!("{}{}", s, l);
+                }
+                s
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let expected = r#"let a_0_0 = 1
+(true);
+let a_1_1 = 2;
+a_1_1 = 3;
+let a_1_2 = 4;
+a_1_2 = 5;
+(true);
+a_1_2 = 6;
+(true);
+let a_3_1 = 7;
+a_3_1 = 8;
+let a_2_2 = 9;
+a_2_2 = 10;
+a_1_2 = 11;
+a_0_0 = 12;"#;
+        assert_eq!(debloated_code, expected);
+        std::fs::remove_file(debloated_filename).unwrap();
+    }
 }

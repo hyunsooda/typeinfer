@@ -398,3 +398,41 @@ pub fn number2typ<'a>(node: &Node<'a>) -> JSTyp {
         JSTyp::Number
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::callgraph;
+    use crate::report;
+    use crate::util;
+
+    #[test]
+    fn testTypeViolation() {
+        let debloated_filename = "debloated.js";
+
+        // 2. Run infer
+        let code = util::read_file(&debloated_filename).unwrap();
+        let tree = node::get_tree(&code);
+        let mut nodes = node::get_nodes(tree.walk(), Order::Pre, &code);
+        let target_callsites = callgraph::gather_callsites("foo", &nodes[0], &code);
+        nodes.remove(0);
+        let mut vars = HashMap::new();
+        let param_typs = &target_callsites[0].1;
+        run_func(&mut vars, param_typs, &nodes, &nodes[0], &code);
+
+        let expected_violations = vec![
+            "[Detected cmp violation] Undefined == Number 
+  if (a == 10) { (example/example.js:3:4)",
+            "[Detected arithmetic violation] Undefined + Number 
+    if (a+10 < 30) { (example/example.js:4:6)",
+            "[Detected arithmetic violation] Bool + Bool 
+      b = false + true; (example/example.js:6:4)",
+        ];
+
+        let violations = report::get_report_history();
+        assert_eq!(violations.len(), expected_violations.len());
+        for (violation, expected) in violations.iter().zip(expected_violations) {
+            assert_eq!(violation, expected);
+        }
+    }
+}
