@@ -1,7 +1,9 @@
 
 - Run
-The command below run the current implementation of javascript type inference with an example at `example/example.js`
+The command below to run the current implementation of javascript type inference with an example at `example/example.js`
+
 `cargo run`
+
 It reports like below:
 ```
 [Detected cmp violation] Undefined == Number
@@ -13,7 +15,7 @@ It reports like below:
 ```
 
 - Test
-`cargo test``
+`cargo test`
 
 
 - TODO
