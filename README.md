@@ -1,3 +1,7 @@
+- typeinfer
+Typeinfer is a static type inference tool that reports type violation that leads to potential bugs.
+Flow[https://github.com/facebook/flow], a static typing tool, requires developer interaction, such as type annotation for the entire project.
+What's the difference? Typeinfer runs without type annotation effort or any strenuous work of preparation for type inference.
 
 - Run
 The command below to run the current implementation of javascript type inference with an example at `example/example.js`
