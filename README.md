@@ -1,14 +1,10 @@
 # typeinfer
-Typeinfer is a static type inference tool that reports type violation that leads to potential bugs.
-Flow[https://github.com/facebook/flow], a static typing tool, requires developer interaction, such as type annotation for the entire project.
-What's the difference? Typeinfer runs without type annotation effort or any strenuous work of preparation for type inference.
+Typeinfer is a static type inference tool that reports potential bugs by detecting type violations.
+Unlike [Flow](https://github.com/facebook/flow), a static typing tool that requires developers to manually annotate types for the entire project,
+Typeinfer does not require any effort in terms of type annotations or any strenuous work of preparation for type inference. It can automatically infer types without any explicit input from the developer.
 
 - Run
-The command below to run the current implementation of javascript type inference with an example at `example/example.js`
-
-`cargo run`
-
-It reports like below:
+Execute the `cargo run` command to inspect the contents of the `example/example.js` file. The output of the inspection will be displayed as follows.
 ```
 [Detected cmp violation] Undefined == Number
   if (a == 10) { (example/example.js:3:4)
@@ -21,15 +17,12 @@ It reports like below:
 - Test
 `cargo test`
 
-
 - TODO
-    - Prepare function paramater
-    - (Done) More accurate precision (ovewrite types in control-flow statements)
+    - Build an environment for a function parameter
     - Implement call graph
-    - (3) Consider to debloat control flow statements (for-loop, switch, etc)
+    - Consider to debloat control flow statements (for-loop, switch, etc)
     - Find entry point and run analysis from there
-    - (Done) Add scope-level annotation
-    - (1) The current implementation is object-insensitive. Consider to change as object-sensitive
-    - (2) Consider array
-    - Differenciate the semantic of `let` and `var`
-    - (0) Seperate pre-analysis (debloat crate) as another crate
+    - The current implementation is object-insensitive. Consider to change as object-sensitive
+    - Consider array
+    - differentiate the semantic of `let` and `var`
+    - Seperate pre-analysis (debloat crate) as another crate
